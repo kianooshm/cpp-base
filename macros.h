@@ -22,6 +22,8 @@
 #ifndef CPP_BASE_MACROS_H_
 #define CPP_BASE_MACROS_H_
 
+#include <atomic>
+
 // The COMPILE_ASSERT macro can be used to verify that a compile time
 // expression is true. For example, you could use it to verify the
 // size of a static array:
@@ -98,5 +100,22 @@ struct CompileAssert {
 #define DISALLOW_COPY_AND_ASSIGN(TypeName) \
   TypeName(const TypeName&);               \
   void operator=(const TypeName&)
+
+// Utilities for logging at an exponentially regulated rate.
+
+#define IS_POW2(num)                (num == 1 || (num & (num - 1)) == 0)
+#define CONCAT(prefix, line)        prefix ## line
+#define MAKE_VAR_NAME(prefix, line) CONCAT(prefix, line)
+#define POW2_LOG_VARNAME_ATOMIC     MAKE_VAR_NAME(occurences_atomic_, __LINE__)
+#define POW2_LOG_VARNAME_TEMP       MAKE_VAR_NAME(occurences_temp_, __LINE__)
+
+// Unlike Google's LOG_EVERY_N macros, this is thread safe.
+#define LOG_EVERY_POW2(severity) \
+  static std::atomic<int64> POW2_LOG_VARNAME_ATOMIC(0); \
+  int64 POW2_LOG_VARNAME_TEMP = ++POW2_LOG_VARNAME_ATOMIC; \
+  if (IS_POW2(POW2_LOG_VARNAME_TEMP)) \
+    google::LogMessage(__FILE__, __LINE__, google::GLOG_ ## severity, \
+                       POW2_LOG_VARNAME_TEMP, &google::LogMessage::SendToLog).stream() \
+                       << "(" << POW2_LOG_VARNAME_TEMP << ") "
 
 #endif  // CPP_BASE_MACROS_H_
